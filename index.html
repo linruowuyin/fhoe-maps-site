@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fhoe-Rail 地图作业站</title>
+<style>
+:root{
+  --bg:#0d1117; --card:#161b22; --card2:#1c2333; --border:#30363d;
+  --text:#e6edf3; --dim:#8b949e; --acc:#58a6ff; --acc2:#1f6feb;
+  --green:#3fb950; --gold:#d29922; --purple:#bc8cff; --red:#f85149;
+  --mono:ui-monospace,'SF Mono',Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,'Segoe UI',Roboto,'PingFang SC','Microsoft YaHei',sans-serif;min-height:100vh}
+header{position:sticky;top:0;z-index:50;background:rgba(13,17,23,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:14px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:700}
+.logo .icon{width:30px;height:30px;border-radius:7px;background:linear-gradient(135deg,#58a6ff,#bc8cff);display:flex;align-items:center;justify-content:center;font-size:16px}
+.logo small{color:var(--dim);font-weight:400;font-size:12px}
+.spacer{flex:1}
+.search-box{background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 14px;width:260px;font-size:14px;outline:none}
+.search-box:focus{border-color:var(--acc)}
+.btn{background:var(--acc2);border:none;color:#fff;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;transition:.15s}
+.btn:hover{filter:brightness(1.15)}
+.btn.ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn.ghost:hover{border-color:var(--acc);color:var(--acc)}
+.btn.sm{padding:5px 10px;font-size:12.5px}
+.btn.green{background:var(--green)}
+.btn.danger{background:var(--red)}
+.stats{display:flex;gap:22px;padding:14px 22px 4px;color:var(--dim);font-size:14px}
+.stats b{color:var(--text);font-size:16px}
+.filter-bar{display:flex;gap:8px;padding:10px 22px;flex-wrap:wrap}
+.chip{background:var(--card);border:1px solid var(--border);border-radius:20px;color:var(--dim);padding:6px 14px;cursor:pointer;font-size:13px;transition:.15s}
+.chip:hover{border-color:var(--acc);color:var(--text)}
+.chip.active{background:var(--acc2);border-color:var(--acc2);color:#fff;font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;padding:16px 22px 60px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;cursor:pointer;transition:.18s;display:flex;flex-direction:column}
+.card:hover{transform:translateY(-3px);border-color:var(--acc);box-shadow:0 8px 24px rgba(88,166,255,.12)}
+.thumb{width:100%;aspect-ratio:16/9;object-fit:cover;background:#0a0d12;display:block}
+.thumb-empty{width:100%;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:13px;background:linear-gradient(135deg,#10151d,#0d1117)}
+.card .body{padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.card .title{font-weight:600;font-size:15px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .author{color:var(--dim);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .meta{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim)}
+.badge{padding:2px 8px;border-radius:5px;font-size:11.5px;font-weight:600}
+.badge-version{background:rgba(210,153,34,.15);color:var(--gold)}
+.badge-type{background:rgba(88,166,255,.12);color:var(--acc)}
+.empty{grid-column:1/-1;text-align:center;color:var(--dim);padding:80px 0;font-size:15px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
+.modal.show{display:flex}
+.modal-content{background:var(--card);border:1px solid var(--border);border-radius:14px;width:min(960px,96vw);max-height:92vh;display:flex;flex-direction:column;overflow:hidden}
+.modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.modal-head h2{font-size:17px;flex:1;min-width:200px}
+.modal-close{background:none;border:none;color:var(--dim);font-size:26px;cursor:pointer;line-height:1}
+.modal-close:hover{color:var(--text)}
+.tabs{display:flex;border-bottom:1px solid var(--border);padding:0 20px;gap:4px;background:rgba(22,27,34,.5)}
+.tab{background:none;border:none;color:var(--dim);padding:12px 16px;cursor:pointer;font-size:14px;border-bottom:2px solid transparent;font-weight:500}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--acc);border-bottom-color:var(--acc)}
+.modal-body{padding:18px 20px;overflow-y:auto;flex:1}
+.tab-pane{display:none}
+.tab-pane.active{display:block}
+/* 路线可视化 */
+.route-list{display:flex;flex-direction:column;gap:0}
+.route-step{display:flex;gap:12px;position:relative;padding:8px 0}
+.route-step::before{content:'';position:absolute;left:16px;top:32px;bottom:-8px;width:2px;background:var(--border)}
+.route-step:last-child::before{display:none}
+.route-step .dot{width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;z-index:1;border:2px solid var(--border);background:var(--card2)}
+.route-step .content{flex:1;min-width:0}
+.route-step .label{font-weight:600;font-size:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.route-step .desc{color:var(--dim);font-size:13px;margin-top:2px;word-break:break-all}
+.route-step .thumb-sm{width:52px;height:52px;object-fit:cover;border-radius:7px;border:1px solid var(--border);margin-top:6px;background:#0a0d12}
+.route-step .dur{background:rgba(88,166,255,.1);color:var(--acc);padding:1px 8px;border-radius:10px;font-size:11.5px;font-weight:600}
+.step-move{background:rgba(63,185,80,.14);color:var(--green)}
+.step-pic{background:rgba(188,140,255,.14);color:var(--purple)}
+.step-key{background:rgba(210,153,34,.14);color:var(--gold)}
+.step-ui{background:rgba(88,166,255,.12);color:var(--acc)}
+/* 编辑器 */
+.editor-bar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.editor-steps{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.ed-step{display:flex;gap:8px;align-items:center;background:var(--card2);border:1px solid var(--border);border-radius:9px;padding:8px 10px;flex-wrap:wrap}
+.ed-step .idx{width:26px;height:26px;border-radius:50%;background:rgba(88,166,255,.12);color:var(--acc);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.ed-step select{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:13px;outline:none}
+.ed-step input{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:13px;width:110px;outline:none}
+.ed-step .val{flex:1;min-width:120px}
+.ed-step .ops{display:flex;gap:4px;margin-left:auto}
+.ed-step .ops button{background:none;border:1px solid var(--border);color:var(--dim);border-radius:5px;width:26px;height:26px;cursor:pointer;font-size:13px}
+.ed-step .ops button:hover{color:var(--text);border-color:var(--acc)}
+.json-edit{width:100%;min-height:380px;background:#0a0d12;border:1px solid var(--border);border-radius:9px;color:var(--text);font-family:var(--mono);font-size:13px;padding:14px;resize:vertical;outline:none;line-height:1.55}
+.json-edit:focus{border-color:var(--acc)}
+.ed-msg{font-size:13px;margin-top:8px;min-height:18px}
+.ed-msg.ok{color:var(--green)}.ed-msg.err{color:var(--red)}
+/* GitHub 上传 */
+.gh-form{display:flex;flex-direction:column;gap:12px}
+.gh-form label{font-size:13px;color:var(--dim);display:flex;flex-direction:column;gap:5px}
+.gh-form input{background:var(--card);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:8px 12px;font-size:13.5px;outline:none;font-family:var(--mono)}
+.gh-form input:focus{border-color:var(--acc)}
+.gh-hint{font-size:12px;color:var(--dim);line-height:1.6}
+.gh-hint code{background:rgba(88,166,255,.1);color:var(--acc);padding:1px 5px;border-radius:4px;font-size:11.5px}
+.gh-msg{font-size:13px;min-height:20px}
+.gh-msg.ok{color:var(--green)}.gh-msg.err{color:var(--red)}
+.progress{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:6px}
+.progress .bar{height:100%;background:var(--green);width:0;transition:width .3s}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--card2);border:1px solid var(--border);border-left:3px solid var(--green);border-radius:9px;padding:12px 18px;font-size:13.5px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.4);display:none;max-width:420px}
+.toast.show{display:block}
+.toast.err{border-left-color:var(--red)}
+.maps-link{font-size:12.5px;color:var(--dim)}
+.maps-link a{color:var(--acc);text-decoration:none}
+.maps-link a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="icon">🗺</div><div>Fhoe-Rail 地图作业站 <small>浏览 · 预览 · 编辑 · 发布</small></div></div>
+  <div class="spacer"></div>
+  <div class="maps-link"><a href="https://github.com/linruowuyin/Fhoe-Rail" target="_blank">Fhoe-Rail 主项目 ↗</a></div>
+  <input class="search-box" id="search" placeholder="搜索地图名 / 作者...">
+  <button class="btn ghost" onclick="openNew()">＋ 新建地图</button>
+</header>
+<div class="stats" id="stats"></div>
+<div class="filter-bar" id="filterBar"></div>
+<div class="grid" id="grid"></div>
+
+<!-- 详情模态：路线预览 / 编辑 / JSON -->
+<div class="modal" id="modal">
+  <div class="modal-content">
+    <div class="modal-head">
+      <h2 id="modalTitle"></h2>
+      <button class="btn sm ghost" id="btnSaveLocal" onclick="saveLocal()">💾 保存到本地</button>
+      <button class="btn sm green" onclick="openGithub()">🚀 发布到 GitHub</button>
+      <button class="btn sm ghost" onclick="downloadZip()">⬇ 导出 .zip</button>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="tabs">
+      <button class="tab active" data-t="route" onclick="switchTab('route')">🗺 路线预览</button>
+      <button class="tab" data-t="edit" onclick="switchTab('edit')">✏️ 编辑步骤</button>
+      <button class="tab" data-t="json" onclick="switchTab('json')">{ } JSON</button>
+    </div>
+    <div class="modal-body">
+      <div class="tab-pane active" id="pane-route"><div class="route-list" id="routeList"></div></div>
+      <div class="tab-pane" id="pane-edit">
+        <div class="editor-bar">
+          <select id="edType" onchange=""></select>
+          <button class="btn sm ghost" onclick="addStep()">＋ 添加步骤</button>
+          <button class="btn sm ghost" onclick="addMovePreset()">＋ 移动块</button>
+          <button class="btn sm ghost" onclick="addPictureStep()">＋ 图片点击</button>
+          <span class="ed-msg" id="edMsg"></span>
+        </div>
+        <div class="editor-steps" id="editorSteps"></div>
+        <div class="editor-bar">
+          <button class="btn sm ghost" onclick="parseJson()">⟳ 从 JSON 载入</button>
+          <span style="font-size:12px;color:var(--dim)">或直接编辑源码：</span>
+        </div>
+        <textarea class="json-edit" id="jsonEdit" spellcheck="false"></textarea>
+      </div>
+      <div class="tab-pane" id="pane-json">
+        <pre id="jsonView" style="font-family:var(--mono);font-size:12.5px;line-height:1.55;white-space:pre-wrap;word-break:break-all;color:#a5d6ff"></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GitHub 上传模态 -->
+<div class="modal" id="ghModal">
+  <div class="modal-content" style="width:min(520px,94vw)">
+    <div class="modal-head"><h2>🚀 发布到 GitHub 地图仓库</h2><button class="modal-close" onclick="closeGh()">&times;</button></div>
+    <div class="modal-body">
+      <div class="gh-form">
+        <label>仓库（owner/repo）<input id="ghRepo" value="linruowuyin/Fhoe-Rail-Maps" placeholder="你的用户名/地图仓库名"></label>
+        <label>Fine-grained PAT（只授 Contents 写权限）<input id="ghToken" type="password" placeholder="github_pat_xxx"></label>
+        <label>目标版本目录<input id="ghVersion" placeholder="default（留空用 default）"></label>
+        <label>提交说明<input id="ghMsg" placeholder="add: 新地图"></label>
+        <div class="gh-hint">
+          <b>怎么拿 PAT：</b>GitHub → Settings → Developer settings → Personal access tokens →
+          Fine-grained tokens → Generate new token → 选这个地图仓库 → 勾 <code>Contents: Read and write</code>。
+          用完全部可吊销，比全局 token 安全。仓库需已存在（空仓库即可，CI 会自动校验）。
+        </div>
+        <div class="gh-msg" id="ghMsg2"></div>
+        <div class="progress" id="ghProg" style="display:none"><div class="bar" id="ghBar"></div></div>
+        <button class="btn green" onclick="doGithub()">确认发布</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let ALL = [], VERSIONS = {}, currentFilter = 'all', currentSearch = '', currentMap = null, currentFile = null;
+let editing = [];  // [{key, value, sec}]
+const STEP_TYPES = {
+  'w':{label:'前进',icon:'⬆',cls:'step-move',desc:v=>`按住 W 前进 ${v}s`},
+  's':{label:'后退',icon:'⬇',cls:'step-move',desc:v=>`按住 S 后退 ${v}s`},
+  'a':{label:'左移',icon:'⬅',cls:'step-move',desc:v=>`按住 A 左移 ${v}s`},
+  'd':{label:'右移',icon:'➡',cls:'step-move',desc:v=>`按住 D 右移 ${v}s`},
+  'ww':{label:'疾跑前进',icon:'🟢',cls:'step-move',desc:v=>`疾跑前进 ${v}s（双键保持）`},
+  'ss':{label:'疾跑后退',icon:'🔻',cls:'step-move',desc:v=>`疾跑后退 ${v}s（双键保持）`},
+  'aa':{label:'疾跑左移',icon:'◀',cls:'step-move',desc:v=>`疾跑左移 ${v}s（双键保持）`},
+  'dd':{label:'疾跑右移',icon:'▶',cls:'step-move',desc:v=>`疾跑右移 ${v}s（双键保持）`},
+  'await':{label:'等待',icon:'⏱',cls:'step-ui',desc:v=>`等待 ${v}s`},
+  'main':{label:'回主界面',icon:'🏠',cls:'step-ui',desc:v=>`返回主界面`},
+  'map':{label:'打开地图',icon:'🗺',cls:'step-ui',desc:v=>`打开地图界面`},
+  'fighting':{label:'战斗',icon:'⚔',cls:'step-ui',desc:v=>`进入战斗`},
+  'f':{label:'F 交互',icon:'🤝',cls:'step-key',desc:v=>`按 F 交互`},
+  'e':{label:'E 战技',icon:'✨',cls:'step-key',desc:v=>`按 E 战技`},
+  'space':{label:'空格',icon:'␣',cls:'step-key',desc:v=>`按 空格`},
+  'esc':{label:'ESC',icon:'⎋',cls:'step-key',desc:v=>`按 ESC`},
+  'b':{label:'B 键',icon:'🅱',cls:'step-key',desc:v=>`按 B`},
+  'floor':{label:'切楼层',icon:'🏢',cls:'step-ui',desc:v=>`切换楼层`},
+  'check':{label:'按周几',icon:'📅',cls:'step-ui',desc:v=>`按星期判断`},
+  'drag':{label:'拖拽',icon:'🖱',cls:'step-ui',desc:v=>`拖拽`},
+  'scroll':{label:'滚动',icon:'📜',cls:'step-ui',desc:v=>`滚动`},
+  'view_rotate':{label:'旋转视角',icon:'🔄',cls:'step-ui',desc:v=>`旋转视角`},
+  'view_reset':{label:'重置视角',icon:'🔃',cls:'step-ui',desc:v=>`重置视角`},
+  'view_set':{label:'设定视角',icon:'🎥',cls:'step-ui',desc:v=>`设定视角`},
+  'scene':{label:'场景',icon:'🎬',cls:'step-ui',desc:v=>`切换场景`},
+  'forbid_retry':{label:'禁止重试',icon:'🚫',cls:'step-ui',desc:v=>`禁止重试`},
+  'caps':{label:'大写锁定',icon:'🔠',cls:'step-key',desc:v=>`切换大写锁定`},
+  'normal_run':{label:'禁疾跑',icon:'🚶',cls:'step-move',desc:v=>`强制禁疾跑`},
+  'lv999_fighting':{label:'Lv999 战斗',icon:'💥',cls:'step-ui',desc:v=>`Lv999 战斗`},
+  'lv999_e':{label:'Lv999 战技',icon:'🌟',cls:'step-key',desc:v=>`Lv999 战技`},
+  'lv999_await':{label:'Lv999 等待',icon:'⏳',cls:'step-ui',desc:v=>`Lv999 等待 ${v}s`},
+};
+const PICTURE_NAMES = {};
+function picReadable(ref){
+  const stem = ref.replace(/\.(webp|png|jpg|jpeg|gif)$/i,'');
+  const m = stem.match(/^(map_)?(\d+)-(\d+)(_point_(\d+))?$/);
+  if (m) {
+    const area = `${m[2]}-${m[3]}`;
+    const pts = m[5] ? ` 点位${m[5]}` : '';
+    return `${area} 区域${pts}`;
+  }
+  if (stem === 'fanhui_1' || stem === 'fanhui_2') return '返回按钮';
+  if (stem === 'confirm') return '确认';
+  if (stem === 'buy') return '购买';
+  if (stem === 'filter') return '筛选';
+  if (stem === 'transfer') return '传送';
+  if (stem === 'map_index' || stem === 'map_index_1' || stem === 'map_index_2' || stem === 'map_index_3') return '地图索引';
+  if (stem === 'orientation_1' || stem === 'orientation_2' || stem === 'orientation_3') return '朝向图标';
+  if (stem === 'first_floor') return '一层';
+  if (stem.endsWith('floor')) return `${stem.replace('floor','')} 层`;
+  if (stem.startsWith('check_')) return '校验点 ' + stem.replace('check_','');
+  if (stem.startsWith('map_')) return '地图 ' + stem.replace('map_','');
+  if (stem.startsWith('finish_')) return '结束 ' + stem.replace('finish_','');
+  return ref;
+}
+
+const DATA_REPO = 'linruowuyin/Fhoe-Rail-Maps';
+function isLocal(){
+  return location.protocol === 'file:' || location.hostname === '127.0.0.1' || location.hostname === 'localhost';
+}
+function picSrc(ref){
+  return isLocal() ? `/pic/${encodeURIComponent(ref)}` : `https://raw.githubusercontent.com/${DATA_REPO}/main/picture/${encodeURIComponent(ref)}`;
+}
+async function init(){
+  // 本地预览用 maps.json，Pages 用仓库 raw
+  let data;
+  try {
+    const res = await fetch('maps.json');
+    if (res.ok) { data = await res.json(); }
+    else throw new Error('no local maps.json');
+  } catch(e) {
+    const res = await fetch(`https://raw.githubusercontent.com/${DATA_REPO}/main/maps.json`);
+    data = await res.json();
+  }
+  ALL = data.maps; VERSIONS = data.versions;
+  renderStats(); renderFilters(); renderGrid();
+  document.getElementById('search').addEventListener('input', e => { currentSearch = e.target.value.toLowerCase(); renderGrid(); });
+  const openFile = new URLSearchParams(location.search).get('open');
+  if (openFile){ const m = ALL.find(x => x.file === openFile); if (m) setTimeout(()=>openModal(m.file),300); }
+}
+function renderStats(){
+  const authorSet = new Set();
+  ALL.forEach(m => m.author.split(',').forEach(a => a.trim() && authorSet.add(a.trim())));
+  document.getElementById('stats').innerHTML =
+    `<span><b>${ALL.length}</b> 张地图</span><span><b>${authorSet.size}</b> 位作者</span><span><b>${Object.keys(VERSIONS).length}</b> 个版本</span>`;
+}
+function renderFilters(){
+  const bar = document.getElementById('filterBar');
+  let html = `<button class="chip active" data-v="all">全部</button>`;
+  Object.keys(VERSIONS).forEach(v => {
+    const n = ALL.filter(m => m.version === v).length;
+    html += `<button class="chip" data-v="${v}">${VERSIONS[v].label} (${n})</button>`;
+  });
+  bar.innerHTML = html;
+  bar.querySelectorAll('.chip').forEach(c => c.onclick = () => {
+    bar.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
+    c.classList.add('active'); currentFilter = c.dataset.v; renderGrid();
+  });
+}
+function renderGrid(){
+  const grid = document.getElementById('grid');
+  const list = ALL.filter(m => (currentFilter === 'all' || m.version === currentFilter)
+    && (!currentSearch || m.name.toLowerCase().includes(currentSearch) || m.author.toLowerCase().includes(currentSearch)));
+  if (!list.length){ grid.innerHTML = `<div class="empty">没有匹配的地图</div>`; return; }
+  grid.innerHTML = list.map(m => {
+    const vlabel = VERSIONS[m.version]?.label || m.version;
+    const stem = (m.file||'').split('/').pop().replace(/\.json$/,'');
+    const thumb = isLocal() ? `/maps/${m.file}`.replace(/\.json$/, '.png') : `https://raw.githubusercontent.com/${DATA_REPO}/main/preview/${m.file}`.replace(/\.json$/, '.png');
+    return `<div class="card" onclick="openModal('${m.file}')">
+      <img class="thumb" src="${thumb}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <div class="thumb-empty" style="display:none">暂无预览</div>
+      <div class="body">
+        <div class="title">${m.name}</div>
+        <div class="author">✍️ ${m.author}</div>
+        <div class="meta"><span class="badge badge-version">${vlabel}</span><span>${m.steps||m.map_len} 步</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ---- 路线可视化 ----
+function stepIcon(k){
+  if (k.startsWith('picture\\')) return '🎯';
+  const t = STEP_TYPES[k]; return t ? t.icon : '🔹';
+}
+function stepLabel(k, v){
+  if (k.startsWith('picture\\')) {
+    const ref = k.split('\\')[1];
+    return `${picReadable(ref)} · 点击匹配`;
+  }
+  const t = STEP_TYPES[k]; return t ? t.label : k;
+}
+function stepDesc(k, v){
+  if (k.startsWith('picture\\')) return `模板匹配到该 UI 元素后点击（等待 ${v}s）`;
+  const t = STEP_TYPES[k]; return t ? t.desc(v) : `执行 ${k}（${v}）`;
+}
+function stepClass(k){
+  if (k.startsWith('picture\\')) return 'step-pic';
+  const t = STEP_TYPES[k]; return t ? t.cls : 'step-ui';
+}
+function renderRoute(d){
+  const el = document.getElementById('routeList');
+  const steps = [];
+  (d.start||[]).forEach(s => steps.push({sec:'进图前', ...s}));
+  (d.map||[]).forEach(s => steps.push({sec:'路线上', ...s}));
+  el.innerHTML = steps.map((s, i) => {
+    const k = Object.keys(s).find(x => x !== 'sec');
+    const v = s[k];
+    const img = k.startsWith('picture\\') ? `<img class="thumb-sm" src="${picSrc(k.split('\\')[1])}" onerror="this.style.display='none'">` : '';
+    return `<div class="route-step">
+      <div class="dot ${stepClass(k)}">${stepIcon(k)}</div>
+      <div class="content">
+        <div class="label">${i+1}. ${stepLabel(k,v)} ${v!==undefined&&typeof v==='number'?`<span class="dur">${v}s</span>`:''}</div>
+        <div class="desc">${stepDesc(k,v)} · <span style="color:var(--acc)">${s.sec}</span></div>
+        ${img}
+      </div>
+    </div>`;
+  }).join('');
+  return steps.length;
+}
+
+// ---- 编辑器 ----
+function openNew(){
+  currentMap = {name:'新地图', author:'', start:[], map:[]};
+  currentFile = null;
+  document.getElementById('modalTitle').textContent = '新建地图';
+  syncEditorFromMap();
+  switchTab('edit');
+  document.getElementById('modal').classList.add('show');
+}
+function openModal(file){
+  const m = ALL.find(x => x.file === file);
+  if (!m) return;
+  currentFile = file;
+  document.getElementById('modalTitle').textContent = `${m.name} — ${VERSIONS[m.version]?.label || m.version}`;
+  // 本地取 maps/，Pages 取仓库 raw map/
+  let url;
+  if (isLocal()) {
+    url = `/maps/${file}`;
+  } else {
+    url = `https://raw.githubusercontent.com/${DATA_REPO}/main/map/${file}`;
+  }
+  fetch(url).then(r=>r.json()).then(d => {
+    currentMap = d;
+    renderRoute(d);
+    syncEditorFromMap();
+    document.getElementById('jsonView').textContent = JSON.stringify(d, null, 2);
+    document.getElementById('jsonEdit').value = JSON.stringify(d, null, 2);
+  }).catch(e=>{ toast('加载地图失败: '+e.message, false); });
+  document.getElementById('modal').classList.add('show');
+}
+function switchTab(t){
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x.dataset.t===t));
+  document.querySelectorAll('.tab-pane').forEach(x => x.classList.toggle('active', x.id==='pane-'+t));
+}
+function syncEditorFromMap(){
+  editing = [];
+  (currentMap.start||[]).forEach(s => Object.entries(s).forEach(([k,v])=>editing.push({key:k, value:v, sec:'进图前'})));
+  (currentMap.map||[]).forEach(s => Object.entries(s).forEach(([k,v])=>editing.push({key:k, value:v, sec:'路线上'})));
+  renderEditor();
+}
+function renderEditor(){
+  const el = document.getElementById('editorSteps');
+  el.innerHTML = editing.map((s,i)=>{
+    const isPic = s.key.startsWith('picture\\');
+    return `<div class="ed-step">
+      <span class="idx">${i+1}</span>
+      ${isPic
+        ? `<input class="val" value="${s.key}" onchange="editing[${i}].key=this.value;renderEditor()" style="font-family:var(--mono)">`
+        : `<select onchange="editing[${i}].key=this.value;renderEditor()">
+            <option value="">— 选择动作 —</option>
+            ${Object.keys(STEP_TYPES).map(k=>`<option ${s.key===k?'selected':''} value="${k}">${STEP_TYPES[k].icon} ${STEP_TYPES[k].label}</option>`).join('')}
+            <option ${isPic?'':''} value="picture\\">🎯 图片点击（自定义）</option>
+          </select>`}
+      <input type="number" step="0.1" value="${s.value}" onchange="editing[${i}].value=parseFloat(this.value)" style="width:76px">
+      <select style="width:90px" onchange="editing[${i}].sec=this.value">
+        <option ${s.sec==='进图前'?'selected':''}>进图前</option>
+        <option ${s.sec==='路线上'?'selected':''}>路线上</option>
+      </select>
+      <div class="ops">
+        <button onclick="moveStep(${i},-1)" title="上移">↑</button>
+        <button onclick="moveStep(${i},1)" title="下移">↓</button>
+        <button onclick="delStep(${i})" title="删除">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('jsonEdit').value = JSON.stringify(buildMapFromEditor(), null, 2);
+}
+function addStep(){ editing.push({key:'await', value:1, sec:'路线上'}); renderEditor(); }
+function addMovePreset(){ editing.push({key:'w', value:1, sec:'路线上'}); renderEditor(); }
+function addPictureStep(){ editing.push({key:'picture\\', value:1.5, sec:'路线上'}); renderEditor(); }
+function moveStep(i,d){ const j=i+d; if(j<0||j>=editing.length)return; [editing[i],editing[j]]=[editing[j],editing[i]]; renderEditor(); }
+function delStep(i){ editing.splice(i,1); renderEditor(); }
+function buildMapFromEditor(){
+  const m = {name: currentMap?.name || '新地图', author: currentMap?.author || '', start:[], map:[]};
+  editing.forEach(s=>{
+    if(!s.key) return;
+    const step = {};
+    let k = s.key;
+    if (k === 'picture\\') { k = 'picture\\map_index.png'; }
+    step[k] = s.value;
+    (s.sec==='进图前'?m.start:m.map).push(step);
+  });
+  return m;
+}
+function parseJson(){
+  try {
+    const d = JSON.parse(document.getElementById('jsonEdit').value);
+    if(!d.name || !d.author || !Array.isArray(d.start) || !Array.isArray(d.map)) throw new Error('缺少 name/author/start/map');
+    currentMap = d; syncEditorFromMap(); renderRoute(d);
+    setEdMsg('已从 JSON 载入', true);
+  } catch(e){ setEdMsg('JSON 解析失败: '+e.message, false); }
+}
+function setEdMsg(t, ok){ const el=document.getElementById('edMsg'); el.textContent=t; el.className='ed-msg '+(ok?'ok':'err'); }
+
+async function saveLocal(){
+  const d = buildMapFromEditor();
+  if (!currentFile){
+    const v = (document.getElementById('ghVersion')?.value||'default') || 'default';
+    currentFile = `${v}/map_${Date.now()%100000}_0.json`;
+  }
+  const res = await fetch('/api/save', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({file: currentFile, data: d})});
+  const r = await res.json();
+  if (r.ok){ setEdMsg('已保存到本地 ✓', true); toast('已保存本地：'+currentFile); await refreshIndex(); }
+  else setEdMsg('保存失败: '+(r.err||'未知'), false);
+}
+async function refreshIndex(){
+  const res = await fetch('maps.json'); const data = await res.json();
+  ALL = data.maps; VERSIONS = data.versions; renderStats(); renderFilters(); renderGrid();
+}
+function downloadZip(){
+  if(!currentFile) return;
+  window.open(`/api/export?file=${encodeURIComponent(currentFile)}`, '_blank');
+}
+
+// ---- GitHub 上传（路径 A：fine-grained PAT → Contents API）----
+function openGithub(){
+  if(!currentMap){ toast('请先打开一张地图', false); return; }
+  document.getElementById('ghRepo').value = 'linruowuyin/Fhoe-Rail-Maps';
+  document.getElementById('ghToken').value = '';
+  document.getElementById('ghVersion').value = currentFile ? currentFile.split('/')[0] : 'default';
+  document.getElementById('ghMsg').value = `add: ${currentMap.name}`;
+  document.getElementById('ghMsg2').textContent = '';
+  document.getElementById('ghProg').style.display = 'none';
+  document.getElementById('ghModal').classList.add('show');
+}
+function closeGh(){ document.getElementById('ghModal').classList.remove('show'); }
+function setGhMsg(t, ok){ const el=document.getElementById('ghMsg2'); el.textContent=t; el.className='gh-msg '+(ok?'ok':'err'); }
+function setProg(p){ document.getElementById('ghProg').style.display='block'; document.getElementById('ghBar').style.width=p+'%'; }
+
+async function ghPut(repo, token, path, contentBase64, message){
+  const url = `https://api.github.com/repos/${repo}/contents/${path}`;
+  let sha = null;
+  try {
+    const r = await fetch(url, {headers:{Authorization:`Bearer ${token}`}});
+    if (r.ok) sha = (await r.json()).sha;
+  } catch(e){}
+  const body = {message, content: contentBase64};
+  if (sha) body.sha = sha;
+  const r = await fetch(url, {method:'PUT', headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  if (!r.ok){ const t = await r.text(); throw new Error(`GitHub ${r.status}: ${t.slice(0,200)}`); }
+  return r.json();
+}
+function b64utf8(s){ return btoa(unescape(encodeURIComponent(s))); }
+async function ghGetPicB64(repo, token, ref){
+  try {
+    // 本地模式先试 /pic/；Pages 模式或本地无此图则从数据仓库 raw 取
+    const urls = isLocal() ? [`/pic/${encodeURIComponent(ref)}`] : [];
+    urls.push(`https://raw.githubusercontent.com/${DATA_REPO}/main/picture/${encodeURIComponent(ref)}`);
+    for (const u of urls){
+      try {
+        const r = await fetch(u);
+        if (!r.ok) continue;
+        const blob = await r.blob();
+        return await new Promise(res=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result.split(',')[1]); fr.readAsDataURL(blob); });
+      } catch(e){}
+    }
+    return null;
+  } catch(e){ return null; }
+}
+async function doGithub(){
+  const repo = document.getElementById('ghRepo').value.trim();
+  const token = document.getElementById('ghToken').value.trim();
+  const version = (document.getElementById('ghVersion').value.trim()||'default');
+  const msg = document.getElementById('ghMsg').value.trim() || 'add map';
+  if (!repo || !token){ setGhMsg('请填仓库和 PAT', false); return; }
+  setGhMsg('正在发布...', true); setProg(5);
+  try {
+    const d = buildMapFromEditor();
+    let hash = 0; for (const c of d.name) hash = (hash*31 + c.charCodeAt(0)) >>> 0;
+    const fname = `map_${(hash%10000)}-1_0.json`;
+    const path = `map/${version}/${fname}`;
+    await ghPut(repo, token, path, b64utf8(JSON.stringify(d, null, 2)), msg);
+    setProg(40);
+    const refs = new Set();
+    [...(d.start||[]), ...(d.map||[])].forEach(s=>Object.keys(s).forEach(k=>{ if(k.startsWith('picture\\')) refs.add(k.split('\\')[1]); }));
+    let i=0; const total = refs.size || 1;
+    for (const ref of refs){
+      const b64 = await ghGetPicB64(repo, token, ref);
+      if (b64) await ghPut(repo, token, `picture/${ref}`, b64, msg);
+      setProg(40 + Math.round((++i/total)*45));
+    }
+    setProg(90);
+    if (currentFile){
+      try {
+        const pr = await fetch(`/maps/${currentFile}`.replace(/\.json$/,'.png'));
+        if (pr.ok){ const blob = await pr.blob(); const b64 = await new Promise(res=>{const fr=new FileReader(); fr.onload=()=>res(fr.result.split(',')[1]); fr.readAsDataURL(blob);});
+          await ghPut(repo, token, `preview/${version}/${fname.replace(/\.json$/,'.png')}`, b64, msg); }
+      } catch(e){}
+    }
+    setProg(100);
+    setGhMsg('发布成功 ✓ 仓库 CI 将自动校验并合并', true);
+    toast('发布成功：'+repo+'/map/'+version+'/'+fname);
+    setTimeout(closeGh, 1600);
+  } catch(e){
+    setGhMsg('发布失败: '+e.message, false);
+  }
+}
+function toast(t, ok=true){ const el=document.getElementById('toast'); el.textContent=t; el.className='toast show'+(ok?'':' err'); setTimeout(()=>el.classList.remove('show'), 3500); }
+function closeModal(){ document.getElementById('modal').classList.remove('show'); }
+document.getElementById('modal').onclick = e => { if (e.target === document.getElementById('modal')) closeModal(); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape'){ closeModal(); closeGh(); } });
+init();
+</script>
+</body>
+</html>
