@@ -359,6 +359,34 @@ function openNew(){
   switchTab('edit');
   document.getElementById('modal').classList.add('show');
 }
+// ---- v2 双认（docs/MAP_FORMAT.md 的 JS 镜像）----
+// 站点在内存里把 v2（img/delay/rep/c）展开成 v1 单键形态再渲染/编辑；
+// 编辑器保存的仍是 v1 —— 对主仓与地图仓的校验都是合法格式，运行时零改动。
+function normalizeStepsJS(arr){
+  if (!Array.isArray(arr)) return [];
+  const out = [];
+  for (const step of arr){
+    if (!step || typeof step !== 'object' || Array.isArray(step)) { out.push(step); continue; }
+    const isImg = typeof step.img === 'string' && step.img;
+    if (!isImg && !('rep' in step) && !('c' in step)) { out.push({...step}); continue; }
+    const rep = Number.isInteger(step.rep) && step.rep >= 1 ? Math.min(step.rep, 100) : 1;
+    const base = {};
+    if (isImg) base[`picture\\${step.img}.png`] = (typeof step.delay === 'number') ? step.delay : 0.8;
+    for (const [k, v] of Object.entries(step)){
+      if (k === 'img' || k === 'delay' || k === 'rep' || k === 'c') continue;
+      base[k] = v;
+    }
+    if (Object.keys(base).length === 0) continue;  // 纯注释步 → 跳过（镜像 Python 的 []）
+    for (let i = 0; i < rep; i++) out.push({...base});
+  }
+  return out;
+}
+function normalizeMapDataJS(d){
+  if (!d || typeof d !== 'object') return d;
+  const {v, ...rest} = d;
+  return {...rest, start: normalizeStepsJS(d.start), map: normalizeStepsJS(d.map)};
+}
+
 function openModal(file){
   const m = ALL.find(x => x.file === file);
   if (!m) return;
@@ -372,8 +400,8 @@ function openModal(file){
     url = `https://raw.githubusercontent.com/${DATA_REPO}/main/map/${file}`;
   }
   fetch(url).then(r=>r.json()).then(d => {
-    currentMap = d;
-    renderRoute(d);
+    currentMap = normalizeMapDataJS(d);  // v2 → v1 规范形（渲染与编辑都用它）
+    renderRoute(currentMap);
     syncEditorFromMap();
     document.getElementById('jsonView').textContent = JSON.stringify(d, null, 2);
     document.getElementById('jsonEdit').value = JSON.stringify(d, null, 2);
@@ -438,7 +466,7 @@ function parseJson(){
   try {
     const d = JSON.parse(document.getElementById('jsonEdit').value);
     if(!d.name || !d.author || !Array.isArray(d.start) || !Array.isArray(d.map)) throw new Error('缺少 name/author/start/map');
-    currentMap = d; syncEditorFromMap(); renderRoute(d);
+    currentMap = normalizeMapDataJS(d); syncEditorFromMap(); renderRoute(currentMap);
     setEdMsg('已从 JSON 载入', true);
   } catch(e){ setEdMsg('JSON 解析失败: '+e.message, false); }
 }
