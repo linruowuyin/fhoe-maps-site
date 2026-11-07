@@ -338,8 +338,8 @@ function renderRoute(d){
     const k = Object.keys(s).find(x => x !== 'sec');
     const v = s[k];
     const img = k.startsWith('picture\\') ? `<img class="thumb-sm" src="${picSrc(k.split('\\')[1])}" onerror="this.style.display='none'">` : '';
-    // v2 可选字段 wait_freezes：normalizeStepsJS 原样透传，到这里展示成静止徽标
-    const wf = (typeof s.wait_freezes === 'number') ? ` · <span class="dur">静止 ${s.wait_freezes}s</span>` : '';
+    // v2 可选字段 wait：normalizeStepsJS 原样透传，到这里展示成静止徽标
+    const wf = (typeof s.wait === 'number') ? ` · <span class="dur">静止 ${s.wait}s</span>` : '';
     return `<div class="route-step">
       <div class="dot ${stepClass(k)}">${stepIcon(k)}</div>
       <div class="content">
